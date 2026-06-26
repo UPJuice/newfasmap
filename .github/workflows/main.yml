@@ -3,7 +3,6 @@ name: Cleanup Large Files
 on:
   workflow_dispatch:
 
-# 关键修正：授予写入和内容操作的权限
 permissions:
   contents: write
   actions: read
@@ -26,7 +25,12 @@ jobs:
         run: |
           git filter-repo --path frames/honey_farm --path frames/iron_farm --invert-paths --force
 
-      # 关键修正：使用更安全的 force-with-lease 推送方式
+      # 关键修正：在 filter-repo 之后，重新添加 origin 远程地址
+      - name: Re-add origin remote
+        run: |
+          git remote add origin https://github.com/UPJuice/newfasmap.git
+
+      # 现在可以正常推送了
       - name: Force push to clean the remote
         run: |
           git push origin --force-with-lease --all
