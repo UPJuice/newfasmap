@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAS服务器档案</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-cream: #E5E1D8;
+            --grid-line: #D0CCC2;
+            --ink-black: #111111;
+            --accent-orange: #F25322;
+            --accent-yellow: #EAB308;
+            --accent-green: #65C02A;
+            --accent-red: #E13238;
+            --panel-grey: #D6D2C8;
+            --pure-white: #FFFFFF;
+            
+            --font-main: 'Noto Sans SC', sans-serif;
+            --font-mono: 'Courier New', Courier, monospace;
+
+            /* SVG 科幻光标 */
+            --cursor-default: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v20M2 12h20" stroke="%23F25322" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="%23EAB308"/></svg>') 12 12, auto;
+            --cursor-pointer: url('data:image/svg+xml;utf8,<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" stroke="%23EAB308" stroke-width="2"/><rect x="9" y="9" width="6" height="6" fill="%23F25322"/></svg>') 12 12, pointer;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; user-select: none; font-family: var(--font-main) !important; cursor: var(--cursor-default); }
+        a, button, li, .card, .timeline-card, .log-card, .close-btn, .link-text, .sys-btn, .power-switch, #mobile-menu-btn, .frame-slider, .druic-link { cursor: var(--cursor-pointer) !important; }
+        body { background-color: var(--ink-black); color: var(--ink-black); display: flex; height: 100vh; overflow: hidden; }
+
+        /* =========================================
+           CRT 滤镜 
+           ========================================= */
+        .crt-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 99999; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%); background-size: 100% 8px; animation: scanlineScroll 30s linear infinite; }
+        @keyframes scanlineScroll { 0% { background-position: 0 0; } 100% { background-position: 0 100vh; } }
+        .crt-vignette { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 99998; background: radial-gradient(circle, rgba(0,0,0,0) 65%, rgba(0,0,0,0.15) 100%); }
+
+        /* 主容器 */
+        #app-container {
+            display: flex; flex: 1; height: 100vh; background-color: var(--bg-cream);
+            background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 100px 100px; border-left: 10px solid var(--accent-orange);
+            transform: scale(0.85); opacity: 0; transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.8s ease; position: relative;
+        }
+        #app-container.loaded { transform: scale(1); opacity: 1; }
+
+        #mobile-header { display: none; }
+        #mobile-overlay { display: none; }
+        #mobile-overlay.mobile-open { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 85; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: var(--bg-cream); border-left: 2px solid var(--ink-black); }
+        ::-webkit-scrollbar-thumb { background: var(--accent-orange); border: 2px solid var(--ink-black); background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.2) 4px, rgba(0,0,0,0.2) 8px); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-yellow); }
+
+        /* =========================================
+           入场加载
+           ========================================= */
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #0D0D0D; z-index: 100000; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: transform 0.6s ease, opacity 0.6s ease; }
+        .loader-bg { position: absolute; top:0; left:0; width: 100%; height: 100%; opacity: 0.05; background-image: radial-gradient(var(--accent-orange) 1px, transparent 1px); background-size: 20px 20px; z-index: -1; }
+        .loader-content { width: 90%; max-width: 700px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        
+        .loader-logo-wrap { position: relative; margin-bottom: 2rem; }
+        /* 减慢呼吸灯速率 */
+        .loader-logo { width: 100%; max-width: 250px; animation: logoGlow 4s infinite ease-in-out; }
+        @keyframes logoGlow { 0%, 100% { filter: drop-shadow(0 0 5px rgba(242, 83, 34, 0.3)); } 50% { filter: drop-shadow(0 0 20px rgba(242, 83, 34, 0.8)); } }
+        
+        .loader-terminal { width: 100%; font-family: var(--font-mono) !important; color: var(--accent-orange); font-size: 0.95rem; line-height: 1.4; min-height: 220px; margin-bottom: 1rem; text-align: left; }
+        .progress-container { width: 100%; border: 2px solid var(--accent-orange); height: 20px; margin-bottom: 3rem; background: rgba(242,83,34,0.1); position: relative;}
+        .progress-bar { height: 100%; background-color: var(--accent-orange); width: 0%; transition: width 0.1s linear; }
+        
+        /* 初始化按钮悬停动画 */
+        .init-btn { background-color: var(--accent-orange); color: #0D0D0D; border: 2px solid #fff; padding: 12px 45px; font-size: 1.5rem; font-weight: 900; box-shadow: 4px 4px 0px rgba(255,255,255,0.2); opacity: 0; pointer-events: none; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .init-btn.ready { opacity: 1; pointer-events: auto; }
+        .init-btn.ready:hover { background-color: var(--accent-yellow); transform: scale(1.08) translateY(-2px); box-shadow: 6px 6px 0px rgba(255,255,255,0.4); border-color: var(--ink-black); color: var(--ink-black); }
+        .init-btn.ready:active { transform: scale(0.95); box-shadow: 0px 0px 0px rgba(255,255,255,0.4); }
+        .loader-copyright { margin-top: 1.5rem; text-align: center; font-family: var(--font-mono) !important; font-size: 0.78rem; color: var(--accent-orange); letter-spacing: 0.5px; }
+
+        /* =========================================
+           侧边栏与系统配置
+           ========================================= */
+        aside { width: 270px; border-right: 2px solid var(--ink-black); display: flex; flex-direction: column; z-index: 90; position: relative; }
+        .sidebar-top { flex: 1; background-color: var(--panel-grey); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 2.5rem 1.5rem; border-bottom: 2px solid var(--ink-black); background-color: var(--accent-orange); text-align: center; }
+        .sidebar-header img { width: 100%; max-width: 180px; display: inline-block; filter: drop-shadow(2px 2px 0px rgba(0,0,0,0.8)); }
+        .sidebar-section-title { font-size: 0.85rem; font-weight: 900; padding: 1.5rem 1.5rem 0.5rem; letter-spacing: 1px; color: #444; }
+        
+        nav ul { list-style: none; padding: 0 1.5rem; }
+        nav ul li { font-size: 1rem; font-weight: bold; padding: 10px 15px; margin-bottom: 10px; border: 2px solid var(--ink-black); background: var(--pure-white); box-shadow: 3px 3px 0px var(--ink-black); transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); display: flex; align-items: center; justify-content: space-between; }
+        .nav-inner { display: flex; align-items: center; gap: 12px; }
+        .nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+        .nav-icon svg { width: 100%; height: 100%; stroke: currentColor; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        nav ul li::after { content: "►"; font-size: 0.7rem; color: #888; opacity: 0; transition: 0.2s; }
+        nav ul li:hover { transform: translate(-3px, -3px) rotate(-1deg); box-shadow: 6px 6px 0px var(--accent-orange); border-color: var(--accent-orange); color: var(--accent-orange); }
+        nav ul li:active { transform: translate(2px, 2px) rotate(0deg); box-shadow: 0px 0px 0px var(--ink-black); }
+        nav ul li.active { background-color: var(--ink-black); color: var(--pure-white); box-shadow: 3px 3px 0px var(--accent-orange); }
+        nav ul li.active::after { color: var(--accent-orange); opacity: 1; }
+
+        .sidebar-bottom { background-color: var(--pure-white); border-top: 2px solid var(--ink-black); padding-bottom: 1rem; }
+        .sys-config-panel { padding: 0 1.5rem; display: flex; flex-direction: column; gap: 8px; }
+        .sys-btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; width: 100%; border: 2px solid var(--ink-black); font-size: 0.85rem; font-family: var(--font-mono) !important; font-weight: 900; background: var(--pure-white); box-shadow: 3px 3px 0 var(--ink-black); position: relative; overflow: hidden; transition: all 0.15s; }
+        .sys-btn svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; }
+        .sys-btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink-black); }
+        .sys-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink-black); }
+        .sys-btn.green { background: var(--accent-green); color: var(--ink-black); }
+        .sys-btn.orange { background: var(--accent-orange); color: var(--pure-white); }
+        .sys-btn.white { background: var(--pure-white); color: var(--ink-black); }
+        .sys-btn.red { background: var(--accent-red); color: var(--pure-white); }
+        .sys-btn.yellow { background: var(--accent-yellow); color: var(--ink-black); }
+        .sys-btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); transform: skewX(-20deg); transition: 0s; }
+        .sys-btn:hover::before { left: 150%; transition: 0.4s ease-in-out; }
+
+        /* 极简发光指示灯 */
+        .sys-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 0 1.5rem; }
+        .sys-version { font-family: var(--font-mono) !important; font-size: 0.75rem; color: #888; font-weight: bold; }
+        .sys-led { width: 10px; height: 10px; background-color: var(--accent-green); border-radius: 50% !important; border: 1px solid var(--ink-black); transition: all 0.2s; box-shadow: 0 0 5px var(--accent-green); }
+        .sys-led.active { animation: ledPulse 3s infinite; }
+        @keyframes ledPulse { 0%, 100% { opacity: 0.8; box-shadow: 0 0 2px var(--accent-green); } 50% { opacity: 1; box-shadow: 0 0 8px var(--accent-green); } }
+        .sidebar-copyright { margin-top: 15px; font-family: var(--font-mono) !important; font-size: 0.65rem; color: #999; font-weight: bold; text-align: center; }
+
+        /* =========================================
+           公共排版
+           ========================================= */
+        /* 黄色大标签延长，取消 max-width */
+        .rect-tag-container { width: 100%; height: 38px; background: var(--accent-yellow); border: 2px solid var(--ink-black); border-bottom: 4px solid var(--ink-black); margin-bottom: 2rem; display: flex; align-items: center; padding: 0 20px; box-shadow: 4px 4px 0px rgba(0,0,0,0.1); }
+        .rect-tag-text { font-size: 1.05rem; font-weight: 900; color: var(--ink-black); font-family: var(--font-mono) !important; letter-spacing: 1px; }
+
+        main { flex: 1; padding: 3rem 4rem; overflow-y: auto; overflow-x: hidden; position: relative; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .section.active .animate-stagger { opacity: 0; animation: fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        .section.active .animate-stagger:nth-child(1) { animation-delay: 0.05s; }
+        .section.active .animate-stagger:nth-child(2) { animation-delay: 0.1s; }
+        .section.active .animate-stagger:nth-child(3) { animation-delay: 0.15s; }
+        .section.active .animate-stagger:nth-child(4) { animation-delay: 0.2s; }
+        @keyframes fadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+
+        .archive-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--ink-black); padding-bottom: 6px; margin-bottom: 1.5rem; font-weight: 900; font-size: 0.9rem; }
+        .archive-header span:first-child { background: var(--ink-black); color: var(--pure-white); padding: 2px 10px; }
+        .archive-header span:last-child { font-family: var(--font-mono) !important; color: #555; }
+        
+        h1 { font-size: 4.5rem; font-weight: 900; letter-spacing: 2px; color: var(--ink-black); -webkit-text-stroke: 0; text-shadow: 4px 4px 0px var(--accent-orange); margin-bottom: 1.2rem; line-height: 1; }
+
+        /* @Druic 专属交互立牌样式 (缩小，与正文对齐) */
+        .druic-link { display: inline; background: var(--accent-orange); color: var(--pure-white); padding: 1px 7px; border: 2px solid var(--ink-black); box-shadow: 2px 2px 0 var(--ink-black); text-decoration: none; position: relative; font-family: var(--font-mono) !important; font-weight: bold; font-size: 0.92em; line-height: 1; white-space: nowrap; transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .druic-link:hover { background: var(--accent-yellow); color: var(--ink-black); box-shadow: 3px 3px 0 var(--ink-black); }
+        .druic-link:active { background: var(--accent-green); box-shadow: 0px 0px 0 var(--ink-black); }
+
+        .card { background: var(--pure-white); border: 2px solid var(--ink-black); box-shadow: 4px 4px 0px var(--ink-black); position: relative; display: flex; flex-direction: column; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .card:hover { transform: translate(-4px, -4px) rotate(-0.5deg); box-shadow: 8px 8px 0px var(--accent-orange); border-color: var(--ink-black); }
+        .card:active { transform: translate(2px, 2px) rotate(0deg); box-shadow: 2px 2px 0px var(--ink-black); }
+        .card-top-tag { position: absolute; top: 12px; right: 12px; font-family: var(--font-mono) !important; font-weight: bold; font-size: 0.8rem; border: 2px solid var(--ink-black); background: var(--pure-white); padding: 2px 8px; z-index: 2; }
+        .card-header { background: var(--ink-black); height: 100px; background-image: radial-gradient(#444 1px, transparent 1px); background-size: 10px 10px; border-bottom: 2px solid var(--ink-black); background-position: center; background-size: cover; }
+        .card-body { padding: 1.5rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card h3 { font-size: 1.8rem; font-weight: 900; margin-bottom: 5px; }
+        .card .sub-title { font-size: 0.95rem; font-weight: bold; color: #555; margin-bottom: 1.5rem; min-height: 20px;}
+        .card-stats { background: var(--bg-cream); border: 2px solid var(--ink-black); display: grid; grid-template-columns: 1fr 1fr; padding: 10px; gap: 10px; margin-bottom: 1.5rem; font-size: 0.85rem; font-weight: bold; }
+        .stat-item { border-bottom: 1px dashed var(--ink-black); padding-bottom: 5px; }
+        .stat-value { color: var(--accent-orange); font-size: 1.05rem; display: block; margin-top: 5px; font-weight: 900; }
+        .card-quote { border-left: 4px solid var(--accent-orange); padding-left: 10px; color: #333; font-weight: bold; line-height: 1.5; font-size: 0.95rem; }
+
+        .member-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 3rem; margin-bottom: 2rem; }
+
+        .timeline { position: relative; padding-left: 40px; margin-top: 2rem; }
+        .timeline::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; background: var(--ink-black); }
+        .timeline-item { position: relative; margin-bottom: 3.5rem; perspective: 1000px; }
+        .timeline-node { position: absolute; left: -31px; top: 20px; width: 14px; height: 14px; background: var(--bg-cream); border: 2px solid var(--ink-black); border-radius: 50% !important; z-index: 2; transition: all 0.3s ease; }
+        .timeline-card { width: 100%; display: flex; flex-direction: column; padding: 1.5rem; background: var(--pure-white); border: 2px solid var(--ink-black); box-shadow: 4px 4px 0px var(--ink-black); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .timeline-item:hover .timeline-card { transform: translate(-5px, -5px) rotateX(2deg); box-shadow: 9px 9px 0px var(--accent-orange); }
+        .timeline-item:active .timeline-card { transform: translate(2px, 2px); box-shadow: 2px 2px 0px var(--ink-black); }
+        .timeline-item:hover .timeline-node { background: var(--pure-white); border-color: var(--accent-orange); transform: scale(1.6); box-shadow: 0 0 15px rgba(242,83,34,0.6); }
+        .timeline-item:hover .tl-tag.action-tag { background: var(--ink-black); color: var(--accent-orange); }
+        .timeline-card .tl-header { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed var(--ink-black); padding-bottom: 10px; }
+        .timeline-card h3 { font-size: 2.2rem; font-weight: 900; margin-bottom: 10px; }
+        .tl-desc { color: #333; margin-bottom: 20px; font-size: 1rem; line-height: 1.6; font-weight: bold; }
+        .tl-tags { display: flex; flex-wrap: wrap; gap: 10px; }
+        .tl-tag { border: 2px solid var(--ink-black); padding: 4px 10px; font-size: 0.85rem; font-weight: bold; background: var(--panel-grey); transition: all 0.2s; }
+        .tl-tag.action-tag { background: var(--accent-yellow); }
+
+        /* =========================================
+           轻拟物 3D 终端机 (Iframe Map)
+           ========================================= */
+        .map-terminal-chassis { background: #DEDCD5; border: 2px solid var(--ink-black); padding: 15px 15px 5px 15px; box-shadow: 6px 6px 0px var(--ink-black); display: flex; flex-direction: column; gap: 10px; width: 100%; height: 75vh; position: relative; }
+        .map-terminal-screen-wrapper { flex: 1; width: 100%; background: #050505; border: 4px solid var(--ink-black); box-shadow: inset 0 0 25px rgba(0,0,0,0.9); position: relative; overflow: hidden; }
+        
+        /* iframe 容器：始终占满、始终有真实尺寸；用 visibility 隐藏而非 display，避免 iframe 内部 3D 引擎获取到 0 尺寸导致 NaN/黑屏。绝不施加 transform / filter。 */
+        .map-iframe-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; background: #050505; visibility: hidden; }
+        .map-iframe-container.show { visibility: visible; }
+        #map-iframe { width: 100%; height: 100%; border: none; display: block; }
+
+        /* CRT 开关效果：独立覆盖层，动画只作用在它身上，绝不触碰 iframe */
+        .crt-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none; background: #000; }
+        .crt-flash.crt-on { display: block; animation: crtPowerOn 0.55s ease-out forwards; }
+        @keyframes crtPowerOn {
+            0%   { opacity: 1; background: #000; clip-path: inset(0 0 0 0); }
+            15%  { opacity: 1; background: #fff; clip-path: inset(49.8% 0 49.8% 0); }
+            45%  { opacity: 1; background: #fff; clip-path: inset(0 0 0 0); }
+            70%  { opacity: 0.6; background: #fff; clip-path: inset(0 0 0 0); }
+            100% { opacity: 0; background: #fff; clip-path: inset(0 0 0 0); }
+        }
+        .crt-flash.crt-off { display: block; animation: crtPowerOff 0.5s ease-in forwards; }
+        @keyframes crtPowerOff {
+            0%   { opacity: 0; background: #fff; clip-path: inset(0 0 0 0); }
+            20%  { opacity: 1; background: #fff; clip-path: inset(0 0 0 0); }
+            55%  { opacity: 1; background: #fff; clip-path: inset(49.8% 0 49.8% 0); }
+            100% { opacity: 1; background: #000; clip-path: inset(49.8% 0 49.8% 0); }
+        }
+
+        .map-terminal-bezel { display: flex; justify-content: space-between; align-items: center; height: 40px; padding: 0 5px; flex-shrink: 0; }
+        .map-vents { display: flex; gap: 5px; }
+        .map-vent { width: 40px; height: 6px; background: #bbb; border: 1px solid #999; box-shadow: inset 1px 1px 3px rgba(0,0,0,0.5); }
+        .map-bezel-hint { flex: 1; text-align: center; font-family: var(--font-mono) !important; font-size: 0.75rem; color: #888; letter-spacing: 0.5px; padding: 0 10px; }
+        .power-switch-container { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono) !important; font-size: 0.8rem; font-weight: bold; }
+        .power-switch { width: 36px; height: 18px; background: #888; border: 2px solid var(--ink-black); position: relative; box-shadow: 2px 2px 0 var(--ink-black); transition: 0.2s; }
+        .power-switch::after { content: ''; position: absolute; top: -2px; left: -2px; width: 18px; height: 18px; background: #E13238; border: 2px solid var(--ink-black); transition: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); animation: pulseRed 1.5s infinite; }
+        @keyframes pulseRed { 0%, 100% { box-shadow: 0 0 5px #E13238; } 50% { box-shadow: 0 0 1px #E13238; } }
+        .power-switch.on { background: #555; }
+        .power-switch.on::after { left: 16px; background: var(--accent-green); animation: none; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); }
+        
+        .map-boot-seq { position: absolute; top: 15px; left: 15px; color: var(--accent-green); font-family: var(--font-mono) !important; font-size: 0.85rem; line-height: 1.6; display: none; z-index: 6; }
+        .map-boot-cursor { display: inline-block; width: 8px; height: 15px; background: var(--accent-green); animation: blink 0.8s infinite; vertical-align: bottom; margin-left: 5px;}
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        /* 弹窗系统 */
+        .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; justify-content: center; align-items: center; z-index: 1000; opacity: 0; transition: opacity 0.25s ease; }
+        .modal.show { display: flex; opacity: 1; }
+        .modal.show .modal-content { animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+        .modal.hiding .modal-content { animation: popOut 0.25s cubic-bezier(0.36, 0, 0.66, -0.56) forwards; }
+        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes popOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.85); opacity: 0; } }
+        
+        .close-btn { position: absolute; top: 15px; right: 15px; background: var(--accent-orange); border: 2px solid var(--ink-black); font-size: 1.5rem; font-weight: 900; color: var(--ink-black); width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; box-shadow: 3px 3px 0px var(--ink-black); z-index: 20; transition: all 0.15s; }
+        .close-btn:hover { background: var(--accent-yellow); transform: scale(1.1) rotate(5deg); }
+        .close-btn:active { transform: scale(0.9); box-shadow: 0px 0px 0px var(--ink-black); }
+
+        .operator-modal { background: var(--bg-cream); border: 2px solid var(--ink-black); padding: 2.5rem; width: 90%; max-width: 950px; max-height: 90vh; overflow-y:auto; box-shadow: 10px 10px 0px var(--ink-black); position: relative; }
+        .member-modal-top { display: flex; gap: 2rem; margin-bottom: 2rem; }
+        .mm-avatar { width: 150px; height: 150px; border: 2px solid var(--ink-black); background: var(--pure-white); background-image: repeating-linear-gradient(45deg, #eee 0, #eee 4px, #e5e5e5 4px, #e5e5e5 8px); background-position: center; background-size: cover; flex-shrink: 0; }
+        .mm-info { flex: 1; }
+        .mm-title-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+        .mm-title-row h2 { font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: -5px; color: var(--ink-black); }
+        .member-modal-bottom { border: 2px solid var(--ink-black); background: var(--pure-white); padding: 1.5rem; position: relative; }
+        .mm-bottom-title { position: absolute; top: -14px; left: 20px; background: var(--accent-orange); color: var(--ink-black); border: 2px solid var(--ink-black); padding: 2px 10px; font-size: 0.95rem; font-weight: 900; text-transform: uppercase;}
+        .mm-log-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 10px; }
+        .log-card { background: var(--pure-white); border: 2px solid var(--ink-black); padding: 1.2rem; position: relative; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .log-card:hover { transform: translate(-3px, -3px); box-shadow: 5px 5px 0px var(--accent-orange); }
+        .log-tag { position: absolute; top: -2px; right: -2px; background: var(--ink-black); color: var(--pure-white); padding: 2px 6px; font-family: var(--font-mono) !important; font-size: 0.8rem; font-weight: bold; }
+        .log-card h4 { font-size: 1.4rem; font-weight: 900; margin-bottom: 10px; border-bottom: 2px solid var(--ink-black); padding-bottom: 5px; }
+
+        .building-terminal-chassis { background: #DEDCD5; border: 2px solid var(--ink-black); padding: 15px; width: 90%; max-width: 950px; box-shadow: 10px 10px 0px var(--ink-black); display: flex; flex-direction: column; gap: 12px; position: relative; }
+        .terminal-bezel-top { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 5px; }
+        .terminal-bezel-top h2 { font-size: 2.8rem; font-weight: 900; line-height: 0.9; color: var(--ink-black); text-shadow: 2px 2px 0 var(--accent-orange); }
+        .terminal-bezel-top .code { font-size: 1.2rem; font-family: var(--font-mono) !important; font-weight: 900; color: var(--ink-black); text-align: right; }
+        .building-terminal-screen { border: 4px solid var(--ink-black); background: #050505; padding: 10px; box-shadow: inset 0 0 20px #000; position: relative; }
+        #anim-canvas { width: 100%; aspect-ratio: 16/9; display: block; border: 2px solid #333; }
+        .terminal-bezel-bottom { display: flex; justify-content: space-between; background: var(--ink-black); color: var(--pure-white); padding: 8px 15px; font-family: var(--font-mono) !important; font-size: 0.85rem; font-weight: bold; border: 2px solid var(--ink-black); }
+        .terminal-bezel-bottom span { color: var(--accent-orange); }
+
+        .slider-wrapper { margin-top: 5px; padding: 10px 5px 5px; border-top: 1px dashed var(--ink-black); display: flex; align-items: center; gap: 15px; }
+        .slider-label { font-family: var(--font-mono) !important; font-size: 0.9rem; font-weight: bold; color: var(--ink-black); white-space: nowrap; }
+        .frame-slider { -webkit-appearance: none; flex: 1; height: 8px; background: var(--ink-black); outline: none; border: 2px solid #555; transition: 0.2s; border-radius: 0 !important; }
+        .frame-slider:hover { border-color: var(--accent-orange); }
+        .frame-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 16px; background: var(--accent-orange); cursor: ew-resize; border: 2px solid var(--ink-black); transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 2px 2px 0 var(--ink-black); border-radius: 0 !important; }
+        .frame-slider::-webkit-slider-thumb:hover { background: var(--accent-yellow); transform: scale(1.2); box-shadow: 4px 4px 0 var(--ink-black); }
+        .frame-slider::-webkit-slider-thumb:active { background: var(--pure-white); transform: scale(0.9); box-shadow: 0 0 0 var(--ink-black); }
+
+        /* =========================================
+           移动端适配 
+           ========================================= */
+        @media (max-width: 768px) {
+            #mobile-header { display: flex; justify-content: space-between; align-items: center; background: var(--ink-black); padding: 10px 20px; position: fixed; top: 0; left: 0; width: 100%; z-index: 80; border-bottom: 2px solid var(--accent-orange); }
+            .mobile-logo { font-size: 1.5rem; font-weight: 900; color: var(--accent-orange); font-family: var(--font-main); }
+            #mobile-menu-btn { background: none; border: none; color: var(--accent-orange); font-size: 2rem; font-family: var(--font-mono) !important; font-weight: bold; }
+            
+            #app-container.loaded { transform: none !important; }
+            #app-container { border: none; flex-direction: column; }
+            
+            aside { position: fixed; top: 0; left: 0; height: 100vh; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1); z-index: 100; box-shadow: 10px 0 20px rgba(0,0,0,0.5); }
+            aside.mobile-open { transform: translateX(0); }
+            
+            #mobile-overlay.mobile-open { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 95; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+            
+            main { padding: 80px 1.5rem 2rem 1.5rem; }
+            h1 { font-size: 2.8rem; text-shadow: 2px 2px 0px var(--accent-orange); }
+            
+            .member-grid-2 { grid-template-columns: 1fr; gap: 2rem; }
+            .timeline { padding-left: 25px; }
+            .timeline::before { left: 8px; }
+            .timeline-node { left: -24px; width: 12px; height: 12px; }
+            .map-terminal-chassis { height: 55vh; }
+            
+            .operator-modal { padding: 1.5rem; width: 95%; max-height: 85vh; }
+            .member-modal-top { flex-direction: column; align-items: center; text-align: center; gap: 1rem; }
+            .mm-title-row { flex-direction: column; align-items: center; gap: 5px; }
+            .mm-log-grid { grid-template-columns: 1fr; }
+            .building-terminal-chassis { padding: 10px; width: 95%; }
+            .terminal-bezel-top h2 { font-size: 1.8rem; }
+            .terminal-bezel-top .code { font-size: 0.9rem; }
+            .building-details-panel { flex-direction: column; gap: 5px; text-align: center; }
+            .slider-wrapper { flex-direction: column; }
+            .close-btn { top: 5px; right: 5px; width: 35px; height: 35px; font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 本地与线上的 BGM 源 -->
+    <audio id="bgm-audio" src="./bgm.mp3" loop preload="auto"></audio>
+
+    <div class="crt-overlay" id="crt-overlay"></div>
+    <div class="crt-vignette" id="crt-vignette"></div>
+
+    <div id="mobile-header">
+        <div class="mobile-logo">FAS</div>
+        <button id="mobile-menu-btn" onclick="toggleMobileMenu()">≡</button>
+    </div>
+
+    <!-- 加载界面 -->
+    <div id="loader">
+        <div class="loader-bg"></div>
+        <div class="loader-content">
+            <div class="loader-logo-wrap">
+                <img src="./fas-logo.png" alt="FAS LOGO" class="loader-logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 300 100\'><text x=\'150\' y=\'65\' font-family=\'Impact\' font-size=\'60\' fill=\'%23F25322\' text-anchor=\'middle\' stroke=\'%23fff\' stroke-width=\'2\'>FAS-SRV</text></svg>'">
+            </div>
+            <div class="loader-terminal" id="terminal-text"></div>
+            <div style="width: 100%; display: flex; justify-content: space-between; font-family: var(--font-mono) !important; font-size: 0.9rem; margin-bottom: 5px; color: var(--accent-orange); font-weight: bold;">
+                <span>SYSTEM_LOAD</span><span id="progress-percent">0%</span>
+            </div>
+            <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+            <button class="init-btn" id="init-btn" onclick="enterSite()">⏻ INITIALIZE</button>
+            <div class="loader-copyright">©2026 Druic. All rights reserved.</div>
+        </div>
+    </div>
+
+    <div id="mobile-overlay" onclick="closeMobileMenu()"></div>
+
+    <div id="app-container">
+        <aside>
+            <div class="sidebar-top">
+                <div class="sidebar-header">
+                    <img src="./fas-logo.png" alt="FAS" onerror="this.style.display='none'; document.getElementById('alt-logo').style.display='block';">
+                    <h2 id="alt-logo" class="i18n" data-zh="FAS-SRV" data-en="FAS-SRV" style="display:none; font-size: 2.5rem; font-weight: 900; color: var(--pure-white); -webkit-text-stroke: 1px var(--ink-black); text-shadow: 2px 2px 0 var(--ink-black);">FAS-SRV</h2>
+                </div>
+                <div class="sidebar-section-title i18n" data-zh="DIRECTORY" data-en="DIRECTORY">DIRECTORY</div>
+                <nav>
+                    <ul id="nav-menu">
+                        <li data-target="home" class="active">
+                            <div class="nav-inner">
+                                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span> 
+                                <span class="i18n" data-zh="简介" data-en="OVERVIEW">简介</span>
+                            </div>
+                        </li>
+                        <li data-target="members">
+                            <div class="nav-inner">
+                                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span> 
+                                <span class="i18n" data-zh="常驻玩家" data-en="PLAYERS">常驻玩家</span>
+                            </div>
+                        </li>
+                        <li data-target="buildings">
+                            <div class="nav-inner">
+                                <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span> 
+                                <span class="i18n" data-zh="主要建筑" data-en="BUILDINGS">主要建筑</span>
+                            </div>
+                        </li>
+                        <li data-target="map">
+                            <div class="nav-inner">
+                                <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span> 
+                                <span class="i18n" data-zh="世界地图" data-en="WORLD MAP">世界地图</span>
+                            </div>
+                        </li>
+                        <li data-target="links">
+                            <div class="nav-inner">
+                                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></span> 
+                                <span class="i18n" data-zh="外部链接" data-en="LINKS">外部链接</span>
+                            </div>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            
+            <div class="sidebar-bottom">
+                <div class="sidebar-section-title">SYSTEM CONFIG</div>
+                <div class="sys-config-panel">
+                    <div class="sys-btn orange" id="btn-bgm" onclick="toggleBgm()">
+                        <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> BGM: ON
+                    </div>
+                    <div class="sys-btn green" id="btn-crt" onclick="toggleCRT()">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> CRT: ON
+                    </div>
+                    <div class="sys-btn white">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> MODE: LIGHT
+                    </div>
+                    <div class="sys-btn yellow" id="btn-lang" onclick="toggleLang()">
+                        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> <span style="color:#111">CHN</span>|<span style="color:#888">EN</span>
+                    </div>
+                </div>
+                <div class="sys-footer">
+                    <div class="sys-version">SYS_VER: 1.0.0</div>
+                    <div class="sys-led active"></div>
+                </div>
+                <div class="sidebar-copyright">©2026 Druic. All rights reserved.</div>
+            </div>
+        </aside>
+
+        <main id="main-content">
+            <!-- 简介 -->
+            <section id="home" class="section active">
+                <div class="archive-header animate-stagger">
+                    <span class="i18n" data-zh="服务器简介" data-en="SERVER PROFILE">服务器简介</span>
+                    <span class="i18n" data-zh="START-DATE: 2022-10-19" data-en="START-DATE: 2022-10-19">START-DATE: 2022-10-19</span>
+                </div>
+                <h1 class="i18n animate-stagger" data-zh="PROFILE" data-en="PROFILE">PROFILE</h1>
+                
+                <div class="rect-tag-container animate-stagger">
+                    <div class="rect-tag-text i18n" data-zh="LOGGED BY: ADMINISTRATOR" data-en="LOGGED BY: ADMINISTRATOR">LOGGED BY: ADMINISTRATOR</div>
+                </div>
+                
+                <div class="animate-stagger" style="background: var(--pure-white); padding: 25px; border: 2px solid var(--ink-black); box-shadow: inset 0 0 10px rgba(0,0,0,0.05);">
+                    <p style="font-size: 1.2rem; line-height: 1.8; font-weight: bold; color: #222;">
+                        <span class="i18n-static" data-zh="一个Minecraft原版生电服务器， 由 " data-en="A vanilla technical Minecraft server, maintained by ">一个Minecraft原版生电服务器， 由 </span><a href="https://space.bilibili.com/255172260" target="_blank" rel="noopener" class="druic-link">@Druic</a><span class="i18n-static" data-zh=" 维护。" data-en=".">　维护。</span>
+                    </p>
+                    <br>
+                    <p style="color: var(--accent-orange); font-family: var(--font-mono) !important; font-weight: bold;" class="i18n" data-zh="> 二服仍处于众筹阶段，请积极参加…" data-en="> The second server is still crowdfunding, please join...">> 二服仍处于众筹阶段，请积极参加…</p>
+                </div>
+            </section>
+
+            <!-- 常驻玩家 (通过 JS 生成) -->
+            <section id="members" class="section">
+                <div class="archive-header animate-stagger">
+                    <span class="i18n" data-zh="常驻玩家" data-en="PLAYERS">常驻玩家</span>
+                    <span class="i18n" data-zh="AUTH_LEVEL: PUBLIC" data-en="AUTH_LEVEL: PUBLIC">AUTH_LEVEL: PUBLIC</span>
+                </div>
+                <h1 class="i18n animate-stagger" data-zh="PLAYERS" data-en="PLAYERS">PLAYERS</h1>
+                <div class="rect-tag-container animate-stagger">
+                    <div class="rect-tag-text i18n" data-zh="STATE: ACTIVE_ROSTER" data-en="STATE: ACTIVE_ROSTER">STATE: ACTIVE_ROSTER</div>
+                </div>
+                <div class="member-grid-2 animate-stagger" id="members-container"></div>
+            </section>
+
+            <!-- 主要建筑 (通过 JS 生成) -->
+            <section id="buildings" class="section">
+                <div class="archive-header animate-stagger">
+                    <span class="i18n" data-zh="主要建筑" data-en="BUILDINGS">主要建筑</span>
+                    <span class="i18n" data-zh="DATABASE_RECORDS: 10" data-en="DATABASE_RECORDS: 10">DATABASE_RECORDS: 10</span>
+                </div>
+                <h1 class="i18n animate-stagger" data-zh="BUILDINGS" data-en="BUILDINGS">BUILDINGS</h1>
+                <div class="rect-tag-container animate-stagger">
+                    <div class="rect-tag-text i18n" data-zh="STATE: RENDER_READY" data-en="STATE: RENDER_READY">STATE: RENDER_READY</div>
+                </div>
+                <div class="timeline animate-stagger" id="timeline-container"></div>
+            </section>
+
+            <!-- 世界地图 3D Iframe 终端 -->
+            <section id="map" class="section">
+                <div class="archive-header animate-stagger">
+                    <span class="i18n" data-zh="世界地图" data-en="WORLD MAP">世界地图</span>
+                    <span class="i18n" data-zh="RADAR_SYS: OFFLINE" data-en="RADAR_SYS: OFFLINE" id="map-radar-status">RADAR_SYS: OFFLINE</span>
+                </div>
+                <h1 class="i18n animate-stagger" data-zh="WORLD MAP" data-en="WORLD MAP">WORLD MAP</h1>
+                
+                <div class="map-terminal-chassis animate-stagger">
+                    <div class="map-terminal-screen-wrapper" id="map-terminal-screen">
+                        <div class="map-boot-seq" id="map-boot-seq"><span class="map-boot-cursor"></span></div>
+                        
+                        <!-- 3D 地图 Iframe 容器：iframe 的 src 在通电时才赋值，断电时清空，确保每次都在可见且有真实尺寸时初始化 -->
+                        <div id="map-iframe-container" class="map-iframe-container">
+                            <iframe id="map-iframe" src="about:blank" data-src="http://47.104.179.227/" allowfullscreen></iframe>
+                        </div>
+
+                        <!-- CRT 开关动画覆盖层（独立于 iframe，不影响其内部状态） -->
+                        <div id="crt-flash" class="crt-flash"></div>
+                    </div>
+                    
+                    <div class="map-terminal-bezel">
+                        <div class="map-vents">
+                            <div class="map-vent"></div><div class="map-vent"></div><div class="map-vent"></div>
+                        </div>
+                        <div class="map-bezel-hint i18n" data-zh="按住右键以旋转视角" data-en="HOLD RIGHT-CLICK TO ROTATE VIEW">按住右键以旋转视角</div>
+                        <div class="power-switch-container">
+                            <span class="i18n" data-zh="SYSTEM_PWR" data-en="SYSTEM_PWR">SYSTEM_PWR</span>
+                            <div class="power-switch" id="map-power-btn" onclick="toggleMapPower()"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 外部链接 -->
+            <section id="links" class="section">
+                <div class="archive-header animate-stagger">
+                    <span class="i18n" data-zh="外部链接" data-en="LINKS">外部链接</span>
+                    <span class="i18n" data-zh="PROTOCOLS: IPV4/TCP" data-en="PROTOCOLS: IPV4/TCP">PROTOCOLS: IPV4/TCP</span>
+                </div>
+                <h1 class="i18n animate-stagger" data-zh="LINKS" data-en="LINKS">LINKS</h1>
+                
+                <div class="rect-tag-container animate-stagger">
+                    <div class="rect-tag-text i18n" data-zh="ESTABLISH_LINK" data-en="ESTABLISH_LINK">ESTABLISH_LINK</div>
+                </div>
+
+                <div class="member-grid-2 animate-stagger" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                    <div class="card" style="cursor: default;">
+                        <div class="card-top-tag">NODE_01</div>
+                        <div class="card-body" style="display:flex; flex-direction:column; justify-content:center;">
+                            <h3 class="i18n" data-zh="SERVER_IP" data-en="SERVER_IP">SERVER_IP</h3>
+                            <div class="sub-title i18n" data-zh="直连地址" data-en="Direct Address">直连地址</div>
+                            <div style="margin: 15px 0; font-size: 1.6rem; font-weight: 900; color: var(--accent-orange); background: var(--ink-black); text-align:center; padding:15px 10px; border: 2px solid #333; font-family: var(--font-mono) !important;">
+                                fas.red
+                            </div>
+                            <div style="font-weight:bold; color:#555; text-align:center;" class="i18n" data-zh="> VER_REQ: Java Edition 1.21.1" data-en="> VER_REQ: Java Edition 1.21.1">> VER_REQ: Java Edition 1.21.1</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="cursor: default;">
+                        <div class="card-top-tag">NODE_02</div>
+                        <div class="card-body" style="display:flex; flex-direction:column; justify-content:center;">
+                            <h3 class="i18n" data-zh="COMMUNITY" data-en="COMMUNITY">COMMUNITY</h3>
+                            <div class="sub-title i18n" data-zh="QQ群" data-en="QQ Group">QQ群</div>
+                            <div style="margin: 15px 0; font-size: 1.8rem; font-weight: 900; color: var(--ink-black); background: var(--accent-yellow); text-align:center; padding:15px 10px; border: 2px solid var(--ink-black); font-family: var(--font-mono) !important;">
+                                611136227
+                            </div>
+                            <div style="font-weight:bold; color:#555; text-align:center;" class="i18n" data-zh="> STATUS: AWAITING RECRUITS" data-en="> STATUS: AWAITING RECRUITS">> STATUS: AWAITING RECRUITS</div>
+                        </div>
+                    </div>
+
+                    <div class="card" onclick="window.open('https://pan.quark.cn/s/3ee57f239894?pwd=8jm1', '_blank')">
+                        <div class="card-top-tag">NODE_03</div>
+                        <div class="card-body" style="display:flex; flex-direction:column; justify-content:center;">
+                            <h3 class="i18n" data-zh="DOWNLOAD" data-en="DOWNLOAD">DOWNLOAD</h3>
+                            <div class="sub-title i18n" data-zh="客户端整合包下载" data-en="Client Modpack Download">客户端整合包下载</div>
+                            <div style="margin: 15px 0; font-size: 1.6rem; font-weight: 900; color: var(--ink-black); background: var(--pure-white); text-align:center; padding:15px 10px; border: 2px solid var(--ink-black); font-family: var(--font-mono) !important; transition: 0.2s;" onmouseover="this.style.background='var(--accent-orange)'; this.style.color='white';" onmouseout="this.style.background='var(--pure-white)'; this.style.color='var(--ink-black)';">
+                                QUARK_PAN
+                            </div>
+                            <div style="font-weight:bold; color:#555; text-align:center;">> PWD: 8jm1</div>
+                        </div>
+                    </div>
+
+                    <div class="card" onclick="window.open('https://www.bilibili.com/video/BV1P6NaeeETD', '_blank')">
+                        <div class="card-top-tag">NODE_04</div>
+                        <div class="card-body" style="display:flex; flex-direction:column; justify-content:center;">
+                            <h3 class="i18n" data-zh="PROMO VIDEO" data-en="PROMO VIDEO">PROMO VIDEO</h3>
+                            <div class="sub-title i18n" data-zh="宣传片" data-en="Promotional Video">宣传片</div>
+                            <div style="margin: 15px 0; font-size: 1.6rem; font-weight: 900; color: var(--pure-white); background: #00A1D6; text-align:center; padding:15px 10px; border: 2px solid var(--ink-black); font-family: var(--font-mono) !important; transition: 0.2s;" onmouseover="this.style.background='var(--accent-orange)';" onmouseout="this.style.background='#00A1D6';">
+                                BILIBILI
+                            </div>
+                            <div style="font-weight:bold; color:#555; text-align:center;" class="i18n" data-zh="> WATCH NOW" data-en="> WATCH NOW">> WATCH NOW</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 40px; font-family: var(--font-mono) !important; color: #888; font-weight: bold;">
+                    ©2026 Druic. All rights reserved.
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 成员智能弹窗 -->
+    <div id="member-modal" class="modal">
+        <div class="modal-content operator-modal">
+            <button class="close-btn" onclick="closeModal('member-modal')">X</button>
+            <div class="member-modal-top">
+                <div class="mm-avatar"></div>
+                <div class="mm-info">
+                    <div class="mm-title-row">
+                        <h2 id="member-name">NAME</h2>
+                        <span style="font-size:1.2rem; font-family: var(--font-mono) !important; font-weight: bold; color:#777;">ID_RECORD</span>
+                    </div>
+                    <div style="background:var(--ink-black); color:var(--pure-white); display:inline-block; padding:4px 10px; margin-bottom:15px; font-weight: bold; font-size: 1rem;" id="member-role">ROLE</div>
+                    <div class="card-stats" style="grid-template-columns: 1fr 1fr; margin-bottom:15px; font-size:0.85rem; background: var(--pure-white);">
+                        <div class="stat-item"><span class="i18n" data-zh="参与建筑数量" data-en="Buildings">参与建筑数量</span> <span class="stat-value" id="member-tech" style="color:#d93025;">N/A</span></div>
+                        <div class="stat-item"><span class="i18n" data-zh="主要贡献" data-en="Contribution">主要贡献</span> <span class="stat-value" id="member-state" style="color:#d93025;">N/A</span></div>
+                    </div>
+                    <div class="card-quote" id="member-quote"></div>
+                </div>
+            </div>
+            <div class="member-modal-bottom">
+                <div class="mm-bottom-title i18n" data-zh="■ PROJECT EXPERIENCE" data-en="■ PROJECT EXPERIENCE">■ PROJECT EXPERIENCE</div>
+                <div class="mm-log-grid" id="mm-log-grid">
+                    <!-- 动态生成参与过的建筑日志 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 建筑动画弹窗 -->
+    <div id="building-modal" class="modal">
+        <div class="modal-content building-terminal-chassis">
+            <button class="close-btn" style="top: -20px; right: -20px; z-index: 100;" onclick="closeModal('building-modal')">X</button>
+            <div class="terminal-bezel-top">
+                <h2 id="building-title">TITLE</h2>
+                <div class="code" id="building-code">builders // CODE</div>
+            </div>
+            <div class="building-details-panel">
+                <div>COORD: <span id="b-coord">[X: 0, Y: 0, Z: 0]</span></div>
+                <div>TARGET: <span class="i18n" data-zh="以1080P渲染" data-en="RENDER(1080P)">以1080P渲染</span></div>
+                <div>TIMELINE: <span class="i18n" data-zh="ACTIVE" data-en="ACTIVE">ACTIVE</span></div>
+            </div>
+            <div class="building-terminal-screen">
+                <canvas id="anim-canvas" width="1920" height="1080"></canvas>
+            </div>
+            <div class="slider-wrapper">
+                <span class="slider-label i18n" data-zh="< 滑动以观看 >" data-en="< SCROLL TO VIEW >">< 滑动以观看 ></span>
+                <input type="range" id="frame-slider" class="frame-slider" min="0" max="98" step="0.1" value="0">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 核心数据模型 (用于自动渲染页面及绑定连接)
+        // ==========================================
+        const buildingsData = [
+            { folder: "enderman_farm", date: "2022.10.20-2022.10.21", code: "enderman_farm", builders: "Druic Morecen", zhTitle: "末影人农场", enTitle: "ENDERMAN FARM", zhDesc: "> 建造状态：已完成\n服务器的首个生电建筑，历经数次修补，至今仍在使用。", enDesc: "> STATUS: COMPLETED\nThe first technical build.", coord: "[X: -29, Y: 41, Z: 264]" },
+            { folder: "industrial_zone", date: "2022.10.22-2022.11.27", code: "industrial_zone", builders: "Druic Turnip Morecen", zhTitle: "第一工业区", enTitle: "INDUSTRIAL ZONE", zhDesc: "> 建造状态：已完成\n容纳了本服最大的生电建筑群，是 @Turnip 等多位玩家心血的结晶。", enDesc: "> STATUS: COMPLETED\nThe largest technical cluster.", coord: "[X: -261, Y: -55, Z: 190]" },
+            { folder: "main_city", date: "2022.10.19-2022.12.06", code: "main_city", builders: "Druic Turnip Morecen Wang shuaiK Houchen", zhTitle: "主城区", enTitle: "MAIN CITY", zhDesc: "> 建造状态：已完成\n服务器最初的开端，坐落于世界原点处，历经三千个游戏日建成。", enDesc: "> STATUS: COMPLETED\nThe origin point of the server.", coord: "[X: 0, Y: 60, Z: 0]" },
+            { folder: "honey_farm", date: "2023.09.08-2023.09.17", code: "honey_farm", builders: "Turnip", zhTitle: "蜂蜜农场", enTitle: "HONEY FARM", zhDesc: "> 建造状态：已完成\n末地养蜂，紫颂果蜜，纯天然，无添加。", enDesc: "> STATUS: COMPLETED\nEnd honey, pure and natural.", coord: "[X: 192, Y: 50, Z: -25]" },
+            { folder: "ocean_city", date: "2023.01.05-至今", code: "ocean_city", builders: "Turnip Morecen", zhTitle: "海上主城", enTitle: "OCEAN CITY", zhDesc: "> 建造状态：未完成\n最后一个完工的建筑。", enDesc: "> STATUS: INCOMPLETE\nThe final build.", coord: "[X: -849, Y: 65, Z: 568]" },
+            { folder: "eiffel_tower", date: "2024.08.11-2024.08.20", code: "eiffel_tower", builders: "Druic Turnip Morecen", zhTitle: "埃菲尔铁塔", enTitle: "EIFFEL TOWER", zhDesc: "> 建造状态：已完成\n起到了对198核刷铁机所产出铁资源的消耗作用。", enDesc: "> STATUS: COMPLETED\nConsumes iron from the 198-core farm.", coord: "[X: -180, Y: 300, Z: 884]" },
+            { folder: "shulker_farm", date: "2023.02.19-2023.02.26", code: "shulker_farm", builders: "Turnip Druic", zhTitle: "潜影贝农场", enTitle: "SHULKER FARM", zhDesc: "> 建造状态：已完成\n开一次机即实现潜影壳自由。", enDesc: "> STATUS: COMPLETED\nShulker shell freedom.", coord: "[X: -1161, Y: 72, Z: -168]" },
+            { folder: "pigman_farm", date: "2024.08.13-2024.08.28", code: "pigman_farm", builders: "Turnip", zhTitle: "百万猪人塔", enTitle: "PIGMAN FARM", zhDesc: "> 建造状态：已完成\n开塔前请三思。", enDesc: "> STATUS: COMPLETED\nThink twice before activation.", coord: "[X: -181, Y: 257, Z: -245]" },
+            { folder: "iron_farm", date: "2023.09.19-2023.10.03", code: "iron_farm", builders: "Turnip", zhTitle: "198核刷铁机", enTitle: "198-CORE IRON FARM", zhDesc: "> 建造状态：已完成\n起到了对埃菲尔铁塔所消耗铁资源的产出作用。", enDesc: "> STATUS: COMPLETED\nProduces iron for the Eiffel Tower.", coord: "[X: -320, Y: 200, Z: 2167]" },
+            { folder: "item_storage", date: "2023.03.18-2023.05.14", code: "item_storage", builders: "Turnip", zhTitle: "全物品仓库", enTitle: "MAIN STORAGE", zhDesc: "> 建造状态：已完成\n能够将游戏中的所有物品自动分类存放，是一个完整生电服务器的最后一块拼图。", enDesc: "> STATUS: COMPLETED\nAutomatic categorization of all items.", coord: "[X: 935, Y: 63, Z: 2107]" }
+        ];
+
+        const playersData = [
+            { id: "op_01", name: "Druic", role: "服主", enRole: "Owner", stat1: "12个", stat2: "维护服务器", quote: "参与了埃菲尔铁塔、空置域等项目的施工。" },
+            { id: "op_02", name: "Turnip", role: "红石工程师", enRole: "Redstone Eng", stat1: "25个", stat2: "生电设施建设", quote: "几乎全部生电设施的主要建造者。" },
+            { id: "op_03", name: "Morecen", role: "后勤支持", enRole: "Logistics", stat1: "9个", stat2: "基础设施建设", quote: "负责各类建筑的施工与后勤工作。" },
+            { id: "op_04", name: "Wang", role: "主城建设者", enRole: "City Builder", stat1: "5个", stat2: "主城建设", quote: "在主城中建造了许多饶有趣味的设施。" },
+            { id: "op_05", name: "shuaiK", role: "路人", enRole: "Passerby", stat1: "3个", stat2: "未知", quote: "在Druic家地下建造了一间地牢。" },
+        ];
+
+        // 自动渲染干员列表
+        function renderMembers() {
+            const container = document.getElementById('members-container');
+            let mHtml = '';
+            playersData.forEach((p) => {
+                mHtml += `
+                <div class="card" onclick="openMember('${p.name}', '${p.role}', '${p.enRole}', '${p.stat1}', '${p.stat2}', '${p.quote}', '${p.id}')">
+                    <div class="card-top-tag">${p.id.replace('op_', 'ID_')}</div>
+                    <div class="card-header op-bg" data-bg="${p.id}"></div>
+                    <div class="card-body">
+                        <h3>${p.name}</h3>
+                        <div class="sub-title i18n" data-zh="${p.role}" data-en="${p.enRole}">${p.role}</div>
+                        <div class="card-stats">
+                            <div class="stat-item"><span class="i18n" data-zh="参与建筑数量" data-en="Buildings">参与建筑数量</span> <span class="stat-value">${p.stat1}</span></div>
+                            <div class="stat-item"><span class="i18n" data-zh="主要贡献" data-en="Contribution">主要贡献</span> <span class="stat-value i18n" data-zh="${p.stat2}" data-en="${p.stat2}" style="color:#d93025;">${p.stat2}</span></div>
+                        </div>
+                        <div class="card-quote i18n" data-zh="${p.quote}" data-en="${p.quote}">${p.quote}</div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = mHtml;
+        }
+
+        // 自动渲染时间线
+        function renderTimeline() {
+            const container = document.getElementById('timeline-container');
+            let html = '';
+            buildingsData.forEach((b) => {
+                html += `
+                <div class="timeline-item">
+                    <div class="timeline-node"></div>
+                    <div class="timeline-card" onclick="openBuilding('${b.code}')">
+                        <div class="tl-header">
+                            <span style="font-weight:900; background:var(--ink-black); color:var(--pure-white); padding:2px 10px; font-family: var(--font-mono) !important;">${b.date}</span>
+                            <span style="color:var(--accent-orange); font-weight:900; font-family: var(--font-mono) !important;">builders: ${b.builders}</span>
+                        </div>
+                        <h3 class="i18n" data-zh="${b.zhTitle}" data-en="${b.enTitle}">${b.zhTitle}</h3>
+                        <div class="tl-desc i18n" style="white-space: pre-line;" data-zh="${b.zhDesc}" data-en="${b.enDesc}">${b.zhDesc}</div>
+                        <div class="tl-tags">
+                            <span class="tl-tag i18n" data-zh="文档记录" data-en="DOCUMENTED">文档记录</span>
+                            <span class="tl-tag action-tag i18n" data-zh="[ 点击访问投影 ]" data-en="[ ACCESS ]">[ 点击访问投影 ]</span>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+        
+        // ==========================================
+        // Web Audio API 声音系统 (BGM与低通滤波)
+        // ==========================================
+        let audioCtx, bgmElement, filterNode, gainNode;
+        let isBgmPlaying = true;
+        let isAudioInit = false;
+        let isLocalFile = window.location.protocol === 'file:';
+
+        function initAudioSystem() {
+            if(isAudioInit) return;
+            bgmElement = document.getElementById('bgm-audio');
+            
+            if (!isLocalFile) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioCtx.createMediaElementSource(bgmElement);
+                    filterNode = audioCtx.createBiquadFilter();
+                    filterNode.type = 'lowpass';
+                    filterNode.frequency.value = 20000; 
+                    gainNode = audioCtx.createGain();
+                    gainNode.gain.value = 0.5; 
+                    source.connect(filterNode).connect(gainNode).connect(audioCtx.destination);
+                } catch(e) {
+                    console.warn("Web Audio API routing failed, using standard audio element.");
+                    isLocalFile = true;
+                }
+            } else {
+                bgmElement.volume = 0.5;
+            }
+
+            bgmElement.play().then(() => {
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            }).catch(e => console.log("Audio play prevented by browser:", e));
+
+            isAudioInit = true;
+        }
+
+        function toggleBgm() {
+            if(!isAudioInit) return;
+            isBgmPlaying = !isBgmPlaying;
+            const btn = document.getElementById('btn-bgm');
+            if (isBgmPlaying) {
+                bgmElement.play();
+                btn.className = 'sys-btn orange';
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> BGM: ON';
+            } else {
+                bgmElement.pause();
+                btn.className = 'sys-btn white';
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg> BGM: OFF';
+            }
+        }
+
+        function setModalAudioEffect(isMuffled) {
+            if (!isBgmPlaying) return;
+            
+            if (!isLocalFile && audioCtx) {
+                const now = audioCtx.currentTime;
+                filterNode.frequency.setTargetAtTime(isMuffled ? 600 : 20000, now, 0.5);
+                gainNode.gain.setTargetAtTime(isMuffled ? 0.15 : 0.5, now, 0.5);
+            } else if (isLocalFile && bgmElement) {
+                let targetVol = isMuffled ? 0.15 : 0.5;
+                let step = (targetVol - bgmElement.volume) / 20;
+                let count = 0;
+                let fade = setInterval(() => {
+                    bgmElement.volume += step;
+                    count++;
+                    if(count >= 20) {
+                        bgmElement.volume = targetVol;
+                        clearInterval(fade);
+                    }
+                }, 25);
+            }
+        }
+
+        // ==========================================
+        // 移动端菜单控制
+        // ==========================================
+        function toggleMobileMenu() {
+            document.querySelector('aside').classList.toggle('mobile-open');
+            document.getElementById('mobile-overlay').classList.toggle('mobile-open');
+        }
+        function closeMobileMenu() {
+            document.querySelector('aside').classList.remove('mobile-open');
+            document.getElementById('mobile-overlay').classList.remove('mobile-open');
+        }
+
+        // ==========================================
+        // 多语言系统 & 乱码引擎
+        // ==========================================
+        let currentLang = 'zh';
+        const glitchCharset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+<>?";
+
+        function scrambleText(el, targetText) {
+            let ticks = 0; const maxTicks = 15; 
+            clearInterval(el.glitchInterval);
+            if(!targetText) return;
+
+            el.glitchInterval = setInterval(() => {
+                let currentStr = "";
+                const revealCount = Math.floor((ticks / maxTicks) * targetText.length);
+                for(let i=0; i<targetText.length; i++) {
+                    if (i < revealCount) currentStr += targetText[i];
+                    else if (targetText[i] === ' ') currentStr += ' ';
+                    else currentStr += glitchCharset[Math.floor(Math.random() * glitchCharset.length)];
+                }
+                el.innerText = currentStr;
+                ticks++;
+                if(ticks > maxTicks) {
+                    clearInterval(el.glitchInterval);
+                    el.innerText = targetText;
+                }
+            }, 25);
+        }
+
+        // i18n-static 仅做静态文本切换（保护内嵌 <a> 链接不被乱码引擎破坏）
+        function applyStaticLang(container) {
+            (container || document).querySelectorAll('.i18n-static').forEach(el => {
+                const t = el.getAttribute(`data-${currentLang}`);
+                if(t !== null) el.textContent = t;
+            });
+        }
+
+        function runScrambleForContainer(container) {
+            if(!container) return;
+            const els = container.querySelectorAll('.i18n');
+            els.forEach(el => {
+                const targetText = el.getAttribute(`data-${currentLang}`);
+                if(targetText) scrambleText(el, targetText);
+            });
+            applyStaticLang(container);
+        }
+
+        function toggleLang() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            const btn = document.getElementById('btn-lang');
+            if (currentLang === 'zh') btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> <span style="color:#111">CHN</span>|<span style="color:#888">EN</span>';
+            else btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> <span style="color:#888">CHN</span>|<span style="color:#111">EN</span>';
+            runScrambleForContainer(document.body);
+            
+            document.getElementById('map-radar-status').innerText = isMapOn 
+                ? (currentLang === 'zh' ? 'RADAR_SYS: 扫描中' : 'RADAR_SYS: SCANNING')
+                : 'RADAR_SYS: OFFLINE';
+        }
+
+        function scramblePage() { runScrambleForContainer(document.querySelector('.section.active')); }
+
+        // ==========================================
+        // 初始化资产与导航
+        // ==========================================
+        function initOperatorBackgrounds() {
+            document.querySelectorAll('.op-bg').forEach(el => {
+                const opId = el.getAttribute('data-bg');
+                const img = new Image();
+                img.src = `./operators/${opId}/status.jpg`;
+                img.onload = () => { el.style.backgroundImage = `url('${img.src}')`; el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center'; };
+            });
+        }
+
+        let crtState = true; 
+        let isModalOpen = false;
+
+        function toggleCRT() {
+            crtState = !crtState;
+            const btn = document.getElementById('btn-crt');
+            if(crtState) { 
+                btn.className = 'sys-btn green'; 
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> CRT: ON'; 
+            } 
+            else { 
+                btn.className = 'sys-btn white'; 
+                btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> CRT: OFF'; 
+            }
+            updateCRTRender();
+        }
+
+        function updateCRTRender() {
+            const overlay = document.getElementById('crt-overlay');
+            const vignette = document.getElementById('crt-vignette');
+            if(crtState && !isModalOpen) { overlay.style.display = 'block'; vignette.style.display = 'block'; } 
+            else { overlay.style.display = 'none'; vignette.style.display = 'none'; }
+        }
+
+        const navItems = document.querySelectorAll('#nav-menu li');
+        const sections = document.querySelectorAll('.section');
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                navItems.forEach(nav => nav.classList.remove('active'));
+                sections.forEach(sec => sec.classList.remove('active'));
+                item.classList.add('active');
+                
+                const targetId = item.getAttribute('data-target');
+                const targetSec = document.getElementById(targetId);
+                targetSec.classList.add('active');
+                
+                runScrambleForContainer(targetSec);
+                if(window.innerWidth <= 768) closeMobileMenu();
+            });
+        });
+
+        // ==========================================
+        // 3D 地图终端 (Iframe 交互)
+        // 关键修复：iframe 的 src 仅在"通电且容器已可见、有真实尺寸"时才赋值，断电时清空。
+        // 这样内嵌 BlueMap(Three.js) 引擎初始化时永远拿到非零的画布尺寸，
+        // 不会出现 aspect = w/0 = NaN 导致相机矩阵崩坏、一操作就黑屏、X/Z 输入框清空的问题。
+        // CRT 动画只跑在独立覆盖层 crt-flash 上，绝不触碰 iframe。
+        // ==========================================
+        let isMapOn = false;
+        const MAP_SRC = "http://47.104.179.227/";
+
+        function toggleMapPower() {
+            if(isModalOpen) return; 
+            isMapOn = !isMapOn;
+            const btn = document.getElementById('map-power-btn');
+            const bootSeq = document.getElementById('map-boot-seq');
+            const statusTxt = document.getElementById('map-radar-status');
+            const iframeContainer = document.getElementById('map-iframe-container');
+            const iframe = document.getElementById('map-iframe');
+            const crtFlash = document.getElementById('crt-flash');
+
+            if (isMapOn) {
+                btn.classList.add('on');
+                bootSeq.style.display = 'block';
+                statusTxt.innerText = currentLang === 'zh' ? 'RADAR_SYS: 启动中...' : 'RADAR_SYS: BOOTING...';
+                
+                let lines = [
+                    "> INITIALIZING KERNEL...",
+                    "> MOUNTING 3D TOPOGRAPHY ENGINE... [OK]",
+                    "> DECRYPTING SECTOR 1-4... [OK]",
+                    "> ESTABLISHING UPLINK TO BLUE_MAP...",
+                    "> SYSTEM ONLINE."
+                ];
+                bootSeq.innerHTML = '<span class="map-boot-cursor"></span>';
+                let i = 0;
+                let interval = setInterval(() => {
+                    bootSeq.innerHTML = bootSeq.innerHTML.replace('<span class="map-boot-cursor"></span>', '') + lines[i] + "<br><span class='map-boot-cursor'></span>";
+                    i++;
+                    if (i >= lines.length) {
+                        clearInterval(interval);
+                        setTimeout(() => {
+                            bootSeq.style.display = 'none';
+                            statusTxt.innerText = currentLang === 'zh' ? 'RADAR_SYS: 扫描中' : 'RADAR_SYS: SCANNING';
+
+                            // 1) 先让容器可见（拥有真实尺寸）
+                            iframeContainer.classList.add('show');
+                            // 2) 再在下一帧赋值 src，确保 BlueMap 初始化时画布已是非零尺寸
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    iframe.src = MAP_SRC;
+                                });
+                            });
+
+                            // CRT 上电动画跑在覆盖层上
+                            crtFlash.classList.remove('crt-off');
+                            crtFlash.style.display = 'block';
+                            void crtFlash.offsetWidth;
+                            crtFlash.classList.add('crt-on');
+                            crtFlash.addEventListener('animationend', function onEnd() {
+                                crtFlash.classList.remove('crt-on');
+                                crtFlash.style.display = 'none';
+                                crtFlash.removeEventListener('animationend', onEnd);
+                            });
+                        }, 600);
+                    }
+                }, 200);
+            } else {
+                btn.classList.remove('on');
+                statusTxt.innerText = 'RADAR_SYS: OFFLINE';
+                // 关机：CRT 断电动画跑在覆盖层上，结束后隐藏 iframe 并彻底卸载其内容
+                crtFlash.classList.remove('crt-on');
+                crtFlash.style.display = 'block';
+                void crtFlash.offsetWidth;
+                crtFlash.classList.add('crt-off');
+                crtFlash.addEventListener('animationend', function onEnd() {
+                    iframeContainer.classList.remove('show');
+                    iframe.src = 'about:blank'; // 卸载，下次通电重新干净初始化
+                    bootSeq.style.display = 'none';
+                    crtFlash.classList.remove('crt-off');
+                    crtFlash.style.display = 'none';
+                    crtFlash.removeEventListener('animationend', onEnd);
+                });
+            }
+        }
+
+        // ==========================================
+        // 入场加载 (非线性缓冲)
+        // ==========================================
+        const loader = document.getElementById('loader');
+        const appContainer = document.getElementById('app-container');
+        const terminal = document.getElementById('terminal-text');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const initBtn = document.getElementById('init-btn');
+
+        const loadSequence = [
+            "> INITIALIZING KERNEL SYSTEM...", "> MOUNTING VFS: /dev/sda1...", "> LOADING MEMORY CLUSTERS... [OK]", 
+            "> DECRYPTING ARCHIVE RECORDS... [OK]", "> MOUNTING TOPOGRAPHY DATA...", "> FORMATTING NOTO SANS SC...", 
+            "> APPLYING SKEUOMORPHIC SHADERS...", "> INJECTING GLITCH SCRAMBLER ENGINE...", "> CALIBRATING UI MATRICES... [OK]", 
+            "> ESTABLISHING SECURE UPLINK...", "> PING: 12ms | PACKET LOSS: 0%", "> FAS MAINFRAME INITIALIZED.", "> AWAITING USER INPUT..."
+        ];
+
+        let lineIdx = 0, progress = 0;
+        
+        function tickLoader() {
+            const jump = Math.random();
+            if(jump > 0.7) {
+                progress += Math.floor(Math.random() * 15) + 5; 
+            } else if (jump > 0.3) {
+                progress += Math.floor(Math.random() * 3) + 1; 
+            } 
+            
+            if (progress >= 100) progress = 100;
+            progressBar.style.width = `${progress}%`; progressPercent.innerText = `${progress}%`;
+            
+            if (lineIdx < loadSequence.length && progress > (lineIdx * (100 / loadSequence.length))) {
+                terminal.innerHTML += loadSequence[lineIdx] + "<br>"; lineIdx++;
+            }
+            if (progress < 100) {
+                setTimeout(tickLoader, Math.random() * 150 + 50); 
+            } else {
+                setTimeout(() => { initBtn.classList.add('ready'); }, 500);
+            }
+        }
+        tickLoader(); 
+
+        function enterSite() {
+            loader.style.opacity = '0'; loader.style.transform = 'scale(1.1)';
+            setTimeout(() => { loader.style.display = 'none'; }, 600);
+            appContainer.classList.add('loaded');
+            
+            initAudioSystem();
+            renderMembers();
+            renderTimeline();
+            initOperatorBackgrounds();
+            runScrambleForContainer(document.body);
+        }
+
+        // ==========================================
+        // 智能挂载控制 (包含闷音效果联动)
+        // ==========================================
+        function closeModal(id, keepMuffled = false) { 
+            const modal = document.getElementById(id);
+            modal.classList.add('hiding'); 
+            
+            setTimeout(() => {
+                modal.classList.remove('show');
+                modal.classList.remove('hiding');
+                isModalOpen = false;
+                updateCRTRender();
+                if(!keepMuffled) setModalAudioEffect(false);
+            }, 250); 
+        }
+
+        function openMember(name, role, enRole, stat1, stat2, quote, opId) {
+            document.getElementById('member-name').innerText = name;
+            document.getElementById('member-role').innerText = currentLang==='zh'?role:enRole;
+            document.getElementById('member-tech').innerText = stat1;
+            document.getElementById('member-state').innerText = stat2;
+            // 弹窗里的语录直接显示该玩家在卡片外显示的事迹
+            document.getElementById('member-quote').innerText = quote;
+            
+            const cleanDesc = (text) => text.split('\n')[1] || text;
+            
+            const pBuildings = buildingsData.filter(b => b.builders.includes(name));
+            const logGrid = document.getElementById('mm-log-grid');
+            let logHtml = '';
+            pBuildings.forEach((b, idx) => {
+                logHtml += `
+                <div class="log-card" onclick="openBuildingDirect('${b.code}')">
+                    <div class="log-tag">LOG_0${idx+1}</div>
+                    <h4 class="i18n" data-zh="${b.zhTitle}" data-en="${b.enTitle}">${b.zhTitle}</h4>
+                    <p class="i18n" data-zh="${cleanDesc(b.zhDesc)}" data-en="${cleanDesc(b.enDesc)}">${cleanDesc(b.zhDesc)}</p>
+                </div>`;
+            });
+            logGrid.innerHTML = logHtml;
+
+            const avatarEl = document.querySelector('.mm-avatar');
+            avatarEl.style.backgroundImage = ''; 
+            const img = new Image(); img.src = `./operators/${opId}/avatar.jpg`;
+            img.onload = () => { avatarEl.style.backgroundImage = `url('${img.src}')`; };
+
+            const modal = document.getElementById('member-modal');
+            modal.classList.add('show');
+            runScrambleForContainer(modal);
+            
+            isModalOpen = true; 
+            updateCRTRender();
+            setModalAudioEffect(true);
+        }
+
+        function openBuildingDirect(code) {
+            closeModal('member-modal', true); 
+            document.querySelector('[data-target="buildings"]').click();
+            setTimeout(() => { openBuilding(code); }, 300);
+        }
+
+        // ==========================================
+        // 真·1080P 序列帧引擎 (大飞轮惯性 + 弱溶解)
+        // ==========================================
+        const canvas = document.getElementById('anim-canvas');
+        const ctx = canvas.getContext('2d');
+        const frameSlider = document.getElementById('frame-slider');
+        const buildingFramesCache = {};
+        
+        let currentFrames = [];
+        let currentFrameIndex = 0, targetFrameIndex = 0, animationReq;
+
+        function createFallbackFrame(index, folderName) {
+            const offscreen = document.createElement('canvas'); offscreen.width = 1920; offscreen.height = 1080;
+            const oCtx = offscreen.getContext('2d'); const progress = index / 99;
+            oCtx.fillStyle = '#111111'; oCtx.fillRect(0, 0, 1920, 1080); oCtx.strokeStyle = 'rgba(214, 210, 200, 0.15)'; oCtx.lineWidth = 2;
+            for(let x=0; x<1920; x+=60) { oCtx.beginPath(); oCtx.moveTo(x,0); oCtx.lineTo(x,1080); oCtx.stroke(); }
+            for(let y=0; y<1080; y+=60) { oCtx.beginPath(); oCtx.moveTo(0,y); oCtx.lineTo(1920,y); oCtx.stroke(); }
+            oCtx.fillStyle = '#E5E1D8'; const rectHeight = 840 * progress; oCtx.fillRect(600, 960 - rectHeight, 720, rectHeight);
+            oCtx.strokeStyle = '#F25322'; oCtx.lineWidth = 10; oCtx.strokeRect(600, 960 - rectHeight, 720, rectHeight);
+            oCtx.fillStyle = '#F25322'; oCtx.font = 'bold 58px "Courier New"';
+            oCtx.fillText(`[NO IMG] DIR: /frames/${folderName}/`, 72, 96);
+            oCtx.fillText(`FRAME: ${index.toString().padStart(2, '0')}.jpg | VOL: ${Math.floor(progress*100)}%`, 72, 168);
+            return offscreen;
+        }
+
+        function openBuilding(code) {
+            const b = buildingsData.find(x => x.code === code);
+            if (!b) return;
+
+            document.getElementById('building-title').innerText = currentLang === 'zh' ? b.zhTitle : b.enTitle;
+            document.getElementById('building-code').innerText = "builders // " + b.builders;
+            document.getElementById('b-coord').innerText = b.coord;
+            
+            const modal = document.getElementById('building-modal');
+            modal.classList.add('show');
+            runScrambleForContainer(modal);
+
+            isModalOpen = true; 
+            updateCRTRender();
+            setModalAudioEffect(true); 
+
+            currentFrameIndex = 0; targetFrameIndex = 0; frameSlider.value = 0;
+
+            if (!buildingFramesCache[b.folder]) {
+                loadFramesForBuilding(b.folder);
+            } else {
+                currentFrames = buildingFramesCache[b.folder];
+                drawFrame(0); renderLoop();
+            }
+        }
+
+        function loadFramesForBuilding(folderName) {
+            const tempFrames = []; let loadedCount = 0;
+            ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#111'; ctx.fillRect(0,0, canvas.width, canvas.height);
+            ctx.fillStyle = '#F25322'; ctx.font = 'bold 58px "Courier New"'; ctx.fillText(`> MOUNTING DIR: /frames/${folderName}/ ...`, 72, 120);
+
+            for (let i = 1; i <= 99; i++) {
+                const img = new Image(); const fileName = i.toString().padStart(2, '0') + '.jpg';
+                img.src = `./frames/${folderName}/${fileName}`;
+                img.onload = () => { tempFrames[i - 1] = img; checkComplete(); };
+                img.onerror = () => { tempFrames[i - 1] = createFallbackFrame(i, folderName); checkComplete(); };
+
+                function checkComplete() {
+                    loadedCount++;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#111'; ctx.fillRect(0,0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#F25322'; ctx.fillText(`> LOADING FILES: ${loadedCount}/99`, 72, 120); ctx.fillRect(72, 192, (loadedCount/99)*1776, 24);
+                    if (loadedCount === 99) {
+                        buildingFramesCache[folderName] = tempFrames; currentFrames = tempFrames;
+                        drawFrame(0); renderLoop();
+                    }
+                }
+            }
+        }
+
+        function drawFrame(fIndex) {
+            const index1 = Math.floor(fIndex); const index2 = Math.min(index1 + 1, currentFrames.length - 1);
+            const alpha = (fIndex - index1) * 0.3; 
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (currentFrames[index1]) { ctx.globalAlpha = 1; ctx.drawImage(currentFrames[index1], 0, 0, canvas.width, canvas.height); }
+            if (alpha > 0 && currentFrames[index2]) { ctx.globalAlpha = alpha; ctx.drawImage(currentFrames[index2], 0, 0, canvas.width, canvas.height); }
+            ctx.globalAlpha = 1;
+        }
+
+        document.getElementById('building-modal').addEventListener('wheel', (e) => {
+            if(document.getElementById('building-modal').classList.contains('show') && currentFrames.length > 0) {
+                e.preventDefault(); 
+                targetFrameIndex += e.deltaY * 0.15; 
+                if (targetFrameIndex < 0) targetFrameIndex = 0;
+                if (targetFrameIndex > 98) targetFrameIndex = 98;
+            }
+        }, { passive: false });
+
+        frameSlider.addEventListener('input', (e) => {
+            if(document.getElementById('building-modal').classList.contains('show')) targetFrameIndex = parseFloat(e.target.value);
+        });
+
+        function renderLoop() {
+            if (currentFrames.length === 0) return;
+            currentFrameIndex += (targetFrameIndex - currentFrameIndex) * 0.025;
+            drawFrame(currentFrameIndex);
+            frameSlider.value = currentFrameIndex;
+
+            if(document.getElementById('building-modal').classList.contains('show')) {
+                animationReq = requestAnimationFrame(renderLoop);
+            } else { cancelAnimationFrame(animationReq); }
+        }
+    </script>
+</body>
+</html>
