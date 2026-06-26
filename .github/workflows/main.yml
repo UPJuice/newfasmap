@@ -1,7 +1,12 @@
 name: Cleanup Large Files
 
 on:
-  workflow_dispatch:  # 让你可以手动点击运行
+  workflow_dispatch:
+
+# 关键修正：授予写入和内容操作的权限
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   cleanup:
@@ -10,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，必须的
+          fetch-depth: 0
 
       - name: Install git-filter-repo
         run: |
@@ -19,9 +24,9 @@ jobs:
 
       - name: Remove large folders from history
         run: |
-          # 删除 frames/honey_farm 和 frames/iron_farm 这两个文件夹的所有历史记录
           git filter-repo --path frames/honey_farm --path frames/iron_farm --invert-paths --force
 
+      # 关键修正：使用更安全的 force-with-lease 推送方式
       - name: Force push to clean the remote
         run: |
-          git push origin --force --all
+          git push origin --force-with-lease --all
