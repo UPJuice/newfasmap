@@ -467,7 +467,7 @@
                         
                         <!-- 3D 地图 Iframe 容器：iframe 的 src 在通电时才赋值，断电时清空，确保每次都在可见且有真实尺寸时初始化 -->
                         <div id="map-iframe-container" class="map-iframe-container">
-                            <iframe id="map-iframe" src="about:blank" data-src="http://47.104.179.227/" allowfullscreen></iframe>
+                            <iframe id="map-iframe" src="about:blank" data-src="https://new.fas.red/" allowfullscreen></iframe>
                         </div>
 
                         <!-- CRT 开关动画覆盖层（独立于 iframe，不影响其内部状态） -->
@@ -887,7 +887,7 @@
         // CRT 动画只跑在独立覆盖层 crt-flash 上，绝不触碰 iframe。
         // ==========================================
         let isMapOn = false;
-        const MAP_SRC = "http://47.104.179.227/";
+        const MAP_SRC = "https://new.fas.red/";
 
         function toggleMapPower() {
             if(isModalOpen) return; 
